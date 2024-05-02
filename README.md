@@ -2,9 +2,9 @@
 
 Koodi saab käivitada nbvieweri kaudu RStudio või Jupyter keskkonnas. Selle keskkonna saab käivitada järgmistel linkidel.
 
-RStudio: [![Binder](http://mybinder.org/badge_logo.svg)](http://mybinder.org/v2/gh/peeter-t2/TM_SV_TartuFall2020/master?urlpath=rstudio)
+RStudio: [![Binder](http://mybinder.org/badge_logo.svg)](http://mybinder.org/v2/gh/peeter-t2/TM_DH_TartuSpring/main?urlpath=rstudio)
 
-Jupyter+R: [![Binder](http://mybinder.org/badge_logo.svg)](http://mybinder.org/v2/gh/peeter-t2/TM_SV_TartuFall2020/master)
+Jupyter+R: [![Binder](http://mybinder.org/badge_logo.svg)](http://mybinder.org/v2/gh/peeter-t2/TM_DH_TartuSpring/main)
 
 ## Oma arvutis
 
