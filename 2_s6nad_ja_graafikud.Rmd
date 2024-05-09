@@ -1,0 +1,748 @@
+---
+title: "R ja RStudio"
+author: "Peeter Tinits"
+output: html_document
+editor_options:
+  chunk_output_type: console
+---
+
+
+
+# Tidytext ja tekstitöötlus
+
+Selles peatükis teeme esimest tutvust tidytext paketiga, mis on loodud tidyverse stiilis tekstitöötluseks R-is. See pakett ei suuda teha kõike ja ei pruugi olla alati ka kõige kiirem, aga teeb siiski ära lihtsama tekstitöötluse, mida meil vaja võib minna. Kui tekib huvi juurde õppida, siis selle paketi enda juhend on siin https://www.tidytextmining.com/.
+
+Juhul kui me alustasime R-i programmi uuesti on tarvis kõigepealt sisse lugeda paketid.
+
+```{r}
+
+library(tidyverse)
+
+```
+
+tidytext pakett on tidyverse põhipaketist eraldi ning seetõttu tuleb eraldi sisse lugeda. Kui seda pole varem installitud, siis utleb ta ka installida.
+
+```{r,eval=F}
+
+install.packages("tidytext")
+
+```
+
+```{r}
+
+library(tidytext)
+
+```
+
+Kui me käivitasime R-i uuesti, siis on meil vaja töötamiseks ka andmefail uuesti sisse lugeda.
+
+```{r}
+
+edetabel <- read_tsv("data/eesti_top40/eesti_skyplus_top40_1994-2018.tsv")
+
+
+```
+
+
+## Populaarsete lugude leidmine
+
+Kui me kasutame count() funktsiooni, kaotame ära kogu ülejäänud informatsiooni. Näiteks võime nii saada kätte populaarsed artistid või nende lood.
+
+```{r}
+
+edetabel %>% 
+  count(artist)
+
+edetabel %>% 
+  count(artist) %>% 
+  filter(n>10)
+
+
+edetabel %>% 
+  count(song, artist,sort =T)
+
+edetabel %>% 
+  count(song, artist,sort =T) %>% 
+  filter(n>2)
+
+```
+
+
+Kui me aga tahaksime kätte saada, millised lood olid populaarsetel artistidel tuleks meil säilitada esialgne info. Selleks on olemas lisakäsk add_count(), mis liidab selle väärtuse uue tulbana. Sel juhul on meil võimalik pärast filtreerides saada kätte juba täpsed lood oma esinemisaastate või laulusõnadena.
+
+```{r}
+
+edetabel %>% 
+  add_count(artist)
+
+edetabel %>% 
+  add_count(artist) %>% 
+  filter(n>10)
+
+
+edetabel %>% 
+  add_count(song, artist,sort =T)
+
+edetabel %>% 
+  add_count(song, artist,sort =T) %>% 
+  filter(n>2)
+
+
+```
+
+
+Selline uue tulba lisamine on sage liigutus andmetöötluse juures. Selle jaoks on R-is olemas üldisem käsk mutate().
+
+## mutate(), n(), row_number()
+
+mutate() käsus anname sisendiks uue tulba nime ja siis funktsiooni, kuidas seda arvutada. Näiteks võime kokku lugeda, mitu rida on, käsuga n() seal sees. Siin n = 1000 igal real. mutate(n=n()) on tegelikult sama käsk kui add_count(). mutate() käsu puhul on aga võimalik lisada ka teistsuguseid uusi tulpasid.
+
+
+```{r}
+
+edetabel %>% 
+  mutate(n=n())
+
+```
+
+Grupeerides edetabeli aastate kaupa, saame aastate loendi. Nüüd võrdub n = 40 iga kord.
+
+```{r}
+
+edetabel %>% 
+  group_by(year) %>% 
+  mutate(n=n())
+
+```
+
+Samuti võime loendada kokku, mitu korda iga artist esineb.
+
+```{r}
+
+edetabel %>% 
+  group_by(artist) %>% 
+  mutate(n=n())
+
+```
+
+Seda saab kasutada selleks, et kergesti kätte saada kõik lood, mida populaarsed artistid on teinud. Nt need, kes üle 20 korra edetabelis.
+
+```{r}
+
+edetabel %>% 
+  group_by(artist) %>% 
+  mutate(n=n()) %>% 
+  filter(n>20)
+
+```
+
+count() funktsiooniga saame küll artistide nimed, aga loendamise algandmed on juba kadunud.
+
+
+```{r}
+
+edetabel %>% 
+  count(artist)
+
+```
+
+Kasulik on ka funktsioon row_number(), mis annab loo positsiooni järjendis. Nt võime anda igale reale numbri 1:1000.
+
+```{r}
+
+edetabel %>% 
+  mutate(row_number=row_number())
+
+```
+
+Või anda neile järjekorranumber igas aastas.
+
+```{r}
+
+edetabel %>% 
+  group_by(year) %>% 
+  mutate(row_number=row_number())
+
+```
+
+Kuna meil on andmestik järjestatud edetabelikoha alusel, siis on uus väärtus edetabelikohaga võrdne. Võime kontrollida, et ühelgi real ei ole need väärtused erinevad.
+
+```{r}
+
+edetabel %>% 
+  group_by(year) %>% 
+  mutate(row_number=row_number()) %>% 
+  filter(!row_number==rank)
+
+
+```
+
+row_number()-it võib kasutada igasugu positsioonväärtuste loomiseks. Näiteks võime nummerdada iga artisti lood varasemast hilisemani. Ja sealt võtta välja ainult artistide esimesed "läbimurdelood".
+
+```{r}
+
+edetabel %>% 
+  group_by(artist) %>% 
+  mutate(row_number=row_number()) %>% 
+  filter(row_number==1)
+
+
+```
+
+Kui andmestik on lihtne, saame row_number()-it kasutada ka filtri sees otse. Esialgu soovitan kasutada sel kohal veel mutate() funktsiooni, et oleks selge kuidas see toimub.
+
+```{r}
+
+edetabel %>% 
+  group_by(artist) %>% 
+  filter(row_number()==1)
+
+```
+
+
+
+Proovi ise! Vali välja üks artist ning leia tema kolm kõige varasemat lugu edetabelis.
+
+```{r}
+
+#---------------------------------------------
+
+
+
+
+
+
+#---------------------------------------------
+
+```
+
+
+Me oleme nüüd üksjagu töötanud andmestike loendamise ja järjestamisega. Tekstitöötluse juures huvitavad meid enamasti aga sõnad. Selle jaoks, et sõnu lähemalt vaadata, laiendame tabelit: teeme nii, et meil oleks igal real üks sõna vaatlusväärtus ehk sõne. Selle jaoks kasutame käsku unnest_tokens()
+
+## unnest_tokens()
+
+Peamine käsk, mis aitab meil tekstidega R-is töötada on unnest_tokens(). unnest_tokens() võtab sisendiks ühe tekstitunnuse ning jaotab ta mingil alusel elementideks (tokeniseerib e. segmenteerib seda). Näiteks siis saab teha tekstidest sõnaloendi. Kui see on tehtud asetab ta iga elemendi omale reale, järgides tidy data põhimõtteid, et meil peaks olema üks vaatlusobjekt rea kohta. Lisaks eemaldab ta tekstist kirjavahemärgid, suurtähed ning teeb muud eeltöötlust, et eraldada elemendid tekstist. NB! Olenevalt uurija huvist tuleb teksti segmenteerida mõnikord teistmoodi - näiteks hoides alles kirjavahemärgid või suurtähed.
+
+unnest_tokens() - muudab andmestikku nii et iga tekstitunnuse element oleks omal real.
+
+
+Vaatame kõigepealt selle lihtsamat tulemust. Järgmine käsk võtab andmestiku tunnnuse lyrics, teeb selle elementideks (mis on vaikimisi sõnad) ning salvestab kõik 'word' nimelisse tulpa.
+
+```{r}
+
+edetabel %>%
+  unnest_tokens(word,lyrics)
+
+
+```
+
+Kui meil varem oli üks lugu tabelis iga rea kohta, siis nüüd on meil igal real üks sõna sellele kaasneva metainfoga. Ehk näha on midagi sellist.
+
+```{r}
+# A tibble: 157,632 x 9
+# year  rank votes artist    song      filename                   source language word          
+# <dbl> <dbl> <dbl> <chr>     <chr>     <chr>                       <dbl> <chr>    <chr>         
+#   1  1994     1    NA Ummamuudu Kõnõtraat lyrics-ummamuudu-konotraat      1 et       välän         
+# 2  1994     1    NA Ummamuudu Kõnõtraat lyrics-ummamuudu-konotraat      1 et       külmetas      
+# 3  1994     1    NA Ummamuudu Kõnõtraat lyrics-ummamuudu-konotraat      1 et       ja            
+# 4  1994     1    NA Ummamuudu Kõnõtraat lyrics-ummamuudu-konotraat      1 et       taivast       
+# 5  1994     1    NA Ummamuudu Kõnõtraat lyrics-ummamuudu-konotraat      1 et       satas         
+# 6  1994     1    NA Ummamuudu Kõnõtraat lyrics-ummamuudu-konotraat      1 et       lummõ    
+```
+
+
+Kuna me kasutame seda andmekuju korduvalt ja tokeniseerimine võtab iga kord veidi aega, salvestame selle töötluse tulemuse ja viitame edaspidi juba töötluse lõpptulemusele.
+
+```{r}
+
+laulusonad <- edetabel %>%
+  unnest_tokens(word,lyrics)
+
+```
+
+Selle tabeliga saame teha samasuguseid operatsioone kui edetabeliga enne. Näiteks võime võtta kõik sõnad, mis on ühelt bändilt.
+
+```{r}
+
+laulusonad %>%
+  filter(artist=="Smilers")
+
+laulusonad %>%
+  filter(artist=="Terminaator")
+
+laulusonad %>%
+  filter(artist=="Ummamuudu")
+
+```
+
+
+Proovi ise! Vali välja üks artist ning võta tabelist välja ainult nende kasutatud sõnad
+
+```{r}
+
+#---------------------------------------------
+
+
+
+
+
+
+#---------------------------------------------
+
+```
+
+
+
+
+## Sõnaloendid
+
+Et hakata mõistma üldisemaid mustreid, milliseid sõnu on valitud, tuleks nad kõigepealt kokku lugeda.
+
+```{r}
+
+laulusonad %>%
+  count(word,sort=T)
+
+```
+
+Nagu näeme, on enimkasutatud sõnad ka lauludes enamvähem samad kui keeles üldiselt. On, ja, ei, ma, kui, sa jne.
+
+Me võime filtrite abil koostada ka sagedussõnastiku mõnele üksikule artistile ja vaadata neid ühekaupa.
+
+```{r}
+
+laulusonad %>%
+  filter(artist=="Põhja-Tallinn") %>%
+  count(word,sort=T)
+
+laulusonad %>%
+  filter(artist=="Ummamuudu") %>%
+  count(word,sort=T)
+
+
+laulusonad %>%
+  filter(artist=="Nublu") %>%
+  count(word,sort=T)
+
+
+```
+
+Proovi ise! Vali välja üks artist ning vaata nende enimkasutatud sõnu.
+
+```{r}
+
+#---------------------------------------------
+
+
+
+
+
+
+#---------------------------------------------
+
+```
+
+
+## Sagedused
+
+Sõnade puhul on enamasti esinemiskordade asemel oluline sagedus - kui suure osa korpusest nad moodustavad. Selle arvutamiseks saame sõnade esinemiskorrad jagada sõnade koguhulgaga ( sum(n) ).
+
+```{r}
+
+laulusonad %>% 
+  count(word,sort=T) %>% 
+  mutate(sagedus=n/sum(n))
+
+```
+
+Me võime sellega teha juba mõningasi võrdlusi. Näiteks võime võrrelda aastaarve või artiste.
+
+```{r}
+
+laulusonad %>% 
+  group_by(year) %>% 
+  count(word,sort=T) %>% 
+  mutate(sagedus=n/sum(n)) #märkus et mutate käsk võtab summa iga grupi sees
+
+laulusonad %>% 
+  group_by(year) %>% 
+  count(word,sort=T) %>% 
+  mutate(sagedus=n/sum(n)) %>% 
+  arrange(desc(sagedus)) %>% 
+  filter(word=="päev")
+
+
+
+```
+
+
+```{r}
+
+laulusonad %>% 
+  group_by(artist) %>% 
+  count(word,sort=T) %>% 
+  mutate(sagedus=n/sum(n)) #märkus et mutate käsk võtab summa iga grupi sees
+
+
+laulusonad %>% 
+  group_by(artist) %>% 
+  count(word,sort=T) %>% 
+  mutate(sagedus=n/sum(n)) %>% 
+  arrange(desc(sagedus)) %>% 
+  filter(word=="päev")
+```
+
+
+Võime teha ka spetsiifilisemaid võrdlusi, näiteks järjestada sõnad selle alusel kui suure osa nad mõne artisti loomingust võtsid ja võtta sealt välja kõige ülekaalukamad sõnad.
+
+
+```{r}
+laulusonad %>% 
+  group_by(artist) %>% 
+  count(word,sort=T) %>% 
+  mutate(sagedus=n/sum(n)) %>% 
+  arrange(desc(sagedus)) %>% 
+  filter(!is.na(word)) %>% 
+  filter(row_number()<100)
+```
+
+Siit näeme näiteks, et sõna satelliidid moodustab tervelt 62% artisti Planeet loomingust. Ja sõnad maiu, on ja piimaauto igaüks 20% ansambli Koer loomingust.
+
+Proovi ise! 
+
+1. Vali välja üks artist ja too esile kõik tema levinumad sõnad.
+
+```{r}
+
+
+
+
+
+```
+
+
+
+2. Võta välja kõik sõnad, mis moodustavad vähemalt 10% ühest loost
+
+```{r}
+#--------
+
+
+
+
+
+
+#--------
+```
+
+
+
+
+## Asukoht tekstis
+
+Kasutades etteantud vahendeid on võimalik ka esitada küsimusi sõnade asukoha kohta. Näiteks, et kui laul kasutas sõna satelliidid nii palju kordi, siis kas seda laulu lõpus või alguses või läbivalt igal pool. Selleks saame kasutada käske group_by(), mutate() ja row_number(). Nimelt, et kui me vaatasime eelmises peatükis edetabeleid row_number() kaudu, siis nüüd võime kasutada seda ka sõnadel nende loomulikus järjekorras. Numbrid ühest kuni loo pikkuseni viitavad sõna asukohale tekstis.
+
+Niisiis, saame iga laulu sees sõna asukoha grupeerides laulud eraldi ning lisades uue tulba row_number().
+
+```{r}
+
+laulusonad %>% 
+  group_by(artist,song,year) %>% 
+  mutate(nr=row_number())
+
+
+```
+
+Kuna lood on erineva pikkusega, siis on võrdluse huvides ehk kasulik vaadata loo pikkust osakaaluna tervikust. Selleks võime lisada ka loendi n() kaudu. mutate() võimaldab nii lisada mitu uut tunnust.
+
+```{r}
+
+laulusonad %>% 
+  group_by(artist,song,year) %>% 
+  mutate(nr=row_number(), n=n())
+
+```
+
+Ja kui meil on olemas nii rea number kui ridade arv võime välja arvutada sõna suhtelise asukoha. Lisame selleks tunnusele n ühe, et kõik tulemused oleks väiksem kui üks. 
+
+```{r}
+
+laulusonad %>% 
+  group_by(artist,song,year) %>% 
+  mutate(nr=row_number(), n=n()) %>% 
+  mutate(asukoht=nr/(n+1))
+
+```
+
+Et me kasutame seda korduvalt võime jälle selle salvestada.
+
+```{r}
+
+asukohad <- laulusonad %>% 
+  group_by(artist,song,year) %>% 
+  mutate(nr=row_number(), n=n()) %>% 
+  mutate(asukoht=nr/(n+1)) %>% 
+  ungroup()
+
+```
+
+
+
+## Graafikud
+
+Üks põhjus, miks just koodi kaudu analüüsile läheneda on võimalus tuua esile täpselt seda aspekti andmestikus, mis meid huvitab. Üks hea viis seda kätte saada on graafikute kaudu. Selle jaoks on tidyverse pakettide seas olemas 'ggplot2'. See on pakett graafikute tegemiseks ühtses vormingus. Graafiku moodustamine käib kihtide kaudu. Üldjoontes peame me määratlema ära, mis on x-teljel, mis on y-teljel, mis määrab ära värvi jne ning mis kihte me graafikule selle põhjal lisame.
+
+Peamised kihid, millega tasuks tuttav olla on:
+
+    ggplot() - aluskiht
+    geom_point() - punktgraafik, kus iga andmepunkt on punkt
+    geom_line() - joongraafik, kus need punktid on mingil alusel ühendatud joontega
+    geom_col() - tulpdiagramm, kus tulba suurus näitab väärtuse suurust
+    geom_text() - lisab teksti graafikule. teksti asukohad on samuti x ja y telje järgi
+    geom_tile() - ruudustikgraafik, kus x ja y telg määravad millise ruuduga on tegemist
+
+Näiteks võime alustuseks teha graafiku parimatest artistidest ja kuvada mitu lugu neil edetabelites oli. Meil on selleks vaja jälle algandmeid.
+
+```{r}
+
+edetabel %>% 
+  count(artist,sort=T) %>% 
+  filter(row_number()<11) %>% 
+  ggplot()
+
+
+```
+
+
+Märgime ära graafiku skaala. X-teljele artisti nime ja y-teljele lugude arvu. Nüüd teeb ggplot() veidi teistsuguse graafiku kui eelmine, kuna artisti nimi ei ole number ning sellele ei ole võimalik teha sujuvat skaalat. Selle asemel kirjutab ggplot kõik nimed graafiku allserva.
+
+```{r}
+
+
+edetabel %>% 
+  count(artist,sort=T) %>% 
+  filter(row_number()<11) %>% 
+  ggplot(aes(x=artist,y=n))
+```
+
+
+
+Lisame nüüd punktikihi, kus iga punkt paikneb oma artisti kohal ning tähistab seda, kui palju lugusid tal oli.
+
+```{r}
+edetabel %>% 
+  count(artist,sort=T) %>% 
+  filter(row_number()<11) %>% 
+  ggplot(aes(x=artist,y=n))+
+  geom_point()
+
+```
+
+
+Ja punktid jõudsidki graafikule. Antud juhul võiks ehk tulpdiagramm sobida paremini kui punktid. Asendame selle jaoks geom_point() funktsiooni geom_col() funktsiooniga. X-telg ja y-telg võivad jääda samaks. Tulbad annavad mastaabist parema ülevaate.
+
+```{r}
+edetabel %>% 
+  count(artist,sort=T) %>% 
+  filter(row_number()<11) %>% 
+  ggplot(aes(x=artist,y=n))+
+  geom_col()
+```
+
+
+Ja ongi muudetud. Märgata võib, et hetkel on nimed tabelis tähestiku järjekorras, mis ehk ei anna kõige paremat ettekujutust sellest, mis järjekorras see top10 ikkagi on. See on nii sellepärast, et tegemist on faktor-muutujaga, mille jaoks me ei ole andnud ggplot()-ile eraldi juhiseid. Faktor-muutujad on tihti vaikimisi tähestiku järjekorras. Tasemete muutmiseks on mitmeid viise (vaata sissejuhatavat osa). Tidyverse’is on pakutud faktorite töötluseks omaette pakett forcats ehk for categorical variables (kategooriliste tunnuste jaoks). Tasemete järjestuse muutmiseks on seal eraldi käsk fct_reorder(), kus tuleb lihtsalt näidata, mis tulpa järjestada ja siis anda järjestamise alus. Antud juhul püüame siis järjestada artisti tulba tasemeid n tulba väärtuste alusel, kahanevas järjekorras. Selle jaoks võime kirjutada fct_reorder(artist, -n). Miinusmärk n ees muudab pöörab ümber numbrite skaala kuna miinusmärgiga on suuremad numbrid väiksema väärtusega ehk -100 on väiksem kui -1.
+
+```{r}
+edetabel %>% 
+  count(artist,sort=T) %>% 
+  filter(row_number()<11) %>% 
+  mutate(artist=fct_reorder(artist,-n)) %>% 
+  ggplot(aes(x=artist,y=n))+
+  geom_col()
+```
+
+Ilusama graafiku jaoks on võimalik jälle telgi sättida veidi, seekord võime ära vahetada x-telje ja y-telje. Selle jaoks on käsk coord_flip(). Sellisel juhul ehk sobib ka paremini järjestada artistid miinusmärgita n alusel.
+
+```{r}
+edetabel %>% 
+  count(artist,sort=T) %>% 
+  filter(row_number()<11) %>% 
+  mutate(artist=fct_reorder(artist,n)) %>% 
+  ggplot(aes(x=artist,y=n))+
+  geom_col()+
+  coord_flip()
+```
+
+
+
+
+Nüüd võime uurida mõne konkreetse sõna esinemist erinevates lauludes. y-teljele laul, x-teljele asukoht.
+
+```{r}
+
+asukohad %>% 
+  filter(word=="armastus") %>% 
+  ggplot()+
+  geom_point(aes(y=song,x=asukoht))
+  
+
+```
+
+Võime sama vaadata mõne teise sõna kohta.
+
+```{r}
+
+asukohad %>% 
+  filter(word=="la") %>% 
+  ggplot()+
+  geom_point(aes(y=song,x=asukoht))
+  
+
+```
+
+Ja samamoodi ka mitme sõna kohta korraga, kasutades või | märki. Saame märkida sõnad joonisel eri värvidega. 
+
+```{r}
+
+asukohad %>% 
+  filter(word=="la"|word=="na") %>% 
+  ggplot()+
+  geom_point(aes(y=song,x=asukoht,color=word))
+  
+
+```
+
+
+Proovi ise! Vali mõni lugu ja sõna selles ning vaata, mis asukohtadel ta esineb.
+
+```{r}
+
+#---------------------------------------------
+
+
+
+
+
+
+
+
+#---------------------------------------------
+
+```
+
+
+
+
+
+Lõpuks võime teha ühe kokkuvõtva graafiku, mille jaoks me kasutame ainult juba meile teadaolevaid andmemuutmisviise. Püüame kujutada korduvate sõnade esinemist ühe laulu sees. Siin valime kõigepealt ühe loo, grupeerime sõnade kaupa ning kogume informatsiooni tema esinemise kohta. Mitmes omasugustest ta oli ja kui palju neid kokku oli. Eemaldame vähem levinumad sõnad ja kuvame x-teljel asukoha, y-teljel mitmes see sõna oli ja kasutame kõigeks selleks nüüd mitte punkti- vaid tekstikihti, lisades sildiks sõna enda.
+
+```{r}
+
+asukohad %>% 
+  filter(song=="Mina ka ft. reket") %>% 
+  group_by(word) %>% 
+  mutate(n=n(),nr_per_word=row_number()) %>% 
+  ungroup() %>% 
+  filter(n>4) %>% 
+  ggplot()+
+  geom_text(aes(x=asukoht,y=nr_per_word,label=word))
+
+```
+
+Mõnel puhul peame olema ettevaatlik, et me ikka võtame ühe loo esinemise korraga. Kui sõnad on topelt või kolmekordselt, võib graafik tulla segasem.
+
+```{r}
+
+asukohad %>% 
+  filter(song=="Käime katuseid mööda"&year==2003) %>% 
+  group_by(word) %>% 
+  mutate(n=n(),nr_per_word=row_number()) %>% 
+  ungroup() %>% 
+  filter(n>1) %>% 
+  ggplot()+
+  geom_text(aes(x=asukoht,y=jitter(nr_per_word,5),label=word))
+
+```
+
+
+
+Proovi ise! Vali mõni lugu ja kujuta selles sagedalt esinevaid sõnu.
+
+```{r}
+
+#---------------------------------------------
+
+
+
+
+
+
+
+
+#---------------------------------------------
+
+```
+
+
+
+## Kui sama sõna esineb mitmel viisil.
+
+Seni oleme filtreerinud ainult täpse võrdsuse kaudu. See ei arvesta võimalusega, et meil on sõna käändes, pöördes või mõnel muul moel muudetud. Nt sõna armastus esineb kokku 98 korda.
+
+```{r}
+
+sonaloend %>% 
+  filter(word=="armastus")
+
+```
+
+Samas kui võimaldame teisi kujusid, leiame veel paarkümmend esinemiskorda.
+
+```{r}
+
+sonaloend %>% 
+  filter(str_detect(word,"armastus"))
+
+```
+
+Üks viis otsinguid paindlikumaks teha on regulaaravaldiste kaudu. Nendega tutvumiseks annan kodutööks sirvida üht regulaaravaldiste juhendit https://kristel.gitbooks.io/regulaaravaldised/content/ ja lahendada ära esimesed 10 ülesannet siin lehel: https://regexone.com/. Regulaaravaldiste testimiseks on üks kasulik leht siin: https://regex101.com/.
+
+
+## Sõnastik
+
+-  %>% - vii andmed järgmisesse protsessi
+- filter() vii andmestik läbi filtri/sõela
+- count() - loeb esinemiste arvu (võib panna mitu tulpa korraga)
+- group_by() - grupeeri andmestik mingi muutuja alusel (võib panna mitu tulpa korraga)
+- ungroup() - vii andmestik taas grupeerimata seisu
+- n() - grupi suurus
+- row_number() - rea number
+- mutate() - loo uus muutuja
+- unnest_tokens() - võtab tekstijupi ja jupitab selle mingil alusel ja paneb iga jupi eraldi reale.
+- left_join() - liidab vasakpoolse andmestiku külge need read, mis sobivad paremast.
+
+
+## Harjutusülesanded
+
+
+1. Vali välja üks artist ja trüki välja 10 levinumat sõna tema sõnavaras.
+
+```{r}
+
+```
+
+
+2. Milline oli levikult kolmeteistkümnes sõna kõigis eestikeelsetes tekstides?
+
+```{r}
+
+```
+
+
+3. Mitu sõna esines kõigil 25-l aastal?
+
+```{r}
+
+```
+
+
