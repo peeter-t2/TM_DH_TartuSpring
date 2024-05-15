@@ -1,0 +1,484 @@
+---
+title: "R ja RStudio"
+author: "Peeter Tinits"
+output: html_document
+editor_options:
+  chunk_output_type: console
+---
+
+
+# Tidytext ja tekstitöötlus 2
+
+Selles peatükis jätkame tutvust tidytext paketiga, mis on loodud tidyverse stiilis tekstitöötluseks R-is. See pakett ei suuda teha kõike ja ei pruugi olla alati ka kõige kiirem, aga teeb siiski ära lihtsama tekstitöötluse, mida meil vaja võib minna. Kui tekib huvi juurde õppida, siis selle paketi enda juhend on siin https://www.tidytextmining.com/.
+
+Alustuseks loeme sisse jälle paketid.
+
+```{r}
+
+library(tidyverse)
+library(tidytext)
+```
+
+## Pikema teksti analüüs
+
+Kui eelmine kord vaatasime ainult väga lühidat tekstivormi laulusõnu, siis täna vaatame pikemaid vorme. Näiteks Tõde ja Õigus 1. köide on terves mahus antud siinses ilukirjanduse kollektsioonis https://datadoi.ee/handle/33/76. Need failid on meil hetkel kaasas, loeme selle sisse.
+
+```{r}
+raamat1 <- read_tsv("data/uiboaed_ilukirjandus/soned/Anton_Hansen_Tammsaare_Tode_ja_oigus_I.utf8",col_names = F) %>% rename(txt=X1)
+```
+
+Vaatame faili sisse, näeme, et failis on iga rida eraldi peatükk. Sellisel juhul saame me kasutada seda infot peatükkide nummerdamiseks, nii nagu eelmine kord nummerdasime järjekorda ja sõnade asukohta.
+
+```{r}
+
+raamat1 <- raamat1 %>% 
+  mutate(chapter=row_number())
+
+```
+
+Tükeldame tekstid sõnadeks unnest_tokens() käsuga paketist tidytext.
+
+```{r}
+
+raamat1_sonad <- raamat1 %>% 
+  unnest_tokens(word,txt)
+
+raamat1_sonad
+
+```
+
+Proovi ise! Vali välja üks sõna ning otsi üles selle esinemiskorrad tekstis.
+
+```{r}
+
+
+
+
+```
+
+
+Meil on võimalik tabeli elemente loendada. Näiteks võime loendada, mitu sõna on ühes peatükis.
+
+```{r}
+
+raamat1_sonad %>% 
+  count(chapter)
+
+```
+
+Et infost head ülevaadet saada, tasub tihti teha graafikuid. Selleks saame kasutada ggplot() funktsiooni. aes() funktsiooni sees peame ära määrama x ja y telgede sisud. geom_col() määrab et tegemist on tulpdiagrammiga. ggplot() osad on eristatud + märgiga mitte %>% märgiga, kuna graafikule lisatakse selle kaudu kihte.
+
+```{r}
+
+raamat1_sonad %>% 
+  count(chapter) %>% 
+  ggplot(aes(x=chapter,y=n))+
+  geom_col()
+
+```
+
+Peatükid siin on erineva pikkusega. Sellega peaks arvestama kui võrdleme peatükke teineteisega.
+
+Teeme ka sõnaloendi, vaatame seda.
+
+```{r}
+
+raamat1_sonaloend <- raamat1_sonad %>% 
+  count(word,sort=T)
+
+raamat1_sonaloend
+
+
+```
+
+Ja teeme sõnaloendi ka peatüki kaupa. Millised sõnad on kõige levinumad?
+
+```{r}
+
+peatykid_sonad <- raamat1_sonad %>% 
+  group_by(chapter) %>% 
+  count(word,sort=T)
+peatykid_sonad
+
+```
+
+Siin peaksime niisiis vaatama sagedust. Kui toornumbri järgi on sõna 'ta' peatükis 37 ka top 10-s, siis sagedus on tal selgelt väiksem.
+
+```{r}
+
+peatykid_sonad <- raamat1_sonad %>% 
+  group_by(chapter) %>% 
+  count(word,sort=T) %>% 
+  mutate(sagedus=n/sum(n))
+
+peatykid_sonad
+
+```
+
+Proovi ise! Võrdle siin ühe sõna esinemissagedust eri peatükkides. Kas märkad midagi huvitavat?
+
+```{r}
+
+
+
+
+
+```
+
+
+
+Veel kasutasime eelmine kord käsku mutate() uute tulpade tegemiseks, ja row_number() ja n() ridade järjestuse ja arvu saamiseks. Selle põhjal saab välja arvutada sõna asukoha protsentides, jagades järjekorranumbri koguarvuga.
+
+```{r}
+
+asukohad <- raamat1_sonad %>% 
+  mutate(nr=row_number(), n=n()) %>% 
+  mutate(asukoht=nr/(n+1)) %>% 
+  ungroup()
+
+```
+
+Ja nende seast saab kasutada juba filter() käsku, et leida meile huvitavaid sõnu. Näiteks võtame raamatu põhiteemad "töö" ja "armastus".
+
+```{r}
+
+asukohad %>% 
+  filter(word=="töö")
+
+asukohad %>% 
+  filter(word=="armastus")
+
+```
+
+Me saame teha nendest asukohtadest graafiku, jälle kasutades ggplot() funktsiooni, määrates x ja y teljed ja lisades sellele kujutava kihi. Punktgraafikuks kasutame funktsiooni geom_point().
+
+```{r}
+
+asukohad %>% 
+  filter(word=="töö"|word=="armastus") %>% 
+  ggplot(aes(x=asukoht,y=word))+
+  geom_point()
+
+
+```
+
+Nii võib otsida kõiksugu sõnu. Otsime näiteks sõnu kõrts ja kirik.
+
+```{r}
+
+asukohad %>% 
+  filter(word=="kõrts"|word=="kirik") %>% 
+  ggplot(aes(x=asukoht,y=word))+
+  geom_point()
+
+```
+
+
+Proovi ise! Vali välja 2 sõna ning kuva nende asukohad teksti sees tuginedes eelnevale koodile.
+
+```{r}
+
+
+
+
+
+
+```
+
+
+## Otsingud ja regulaaravaldised
+
+Siiani oleme filter käsus kasutanud ainult täpset sarnasust. Selleks on ka teisi variante. Me võime kasutada käsku str_detect(), et kontrollida kas sõna sisaldab mõnd täheühendit.
+
+```{r}
+
+"hobune" %>% 
+  str_detect("hobu")
+
+
+"hobuse" %>% 
+  str_detect("hobune")
+
+
+```
+
+
+
+Me võime selle abil välja võtta näiteks kõrts ja kirik erinevates käänetes. str_detect() käsu saame panna filtri sisse ja seeläbi võtta välja õiged read.
+
+```{r}
+peatykid_sonad %>% 
+  count(word)  %>% 
+  filter(str_detect(word,"kõrts")|str_detect(word,"kirik"))
+
+
+```
+
+
+Proovi ise! Vali välja paar sõna ning otsi nende erinevaid esinemisvorme. Millised vormid on kõige sagedasemad?
+
+
+```{r}
+
+
+
+
+
+```
+
+
+Sama otsingu alusel saame leida ka sõnade asukohad.
+
+```{r}
+asukohad %>% 
+  filter(str_detect(word,"kõrts")|str_detect(word,"kirik"))
+
+
+```
+
+Kõige parema ülevaate saab jälle visuaalselt. Teeme leidude asukohtadest ka graafiku.
+
+```{r}
+
+asukohad %>% 
+  filter(str_detect(word,"kõrts")|str_detect(word,"kirik")) %>% 
+  ggplot(aes(x=asukoht,y=word))+
+  geom_point()
+
+```
+
+Graafikul kujutatud sõnade variante on väga palju. Üks viis seda lihtsustada on teha regulaaravaldise kaudu ka lisatulp, kus võtame välja sõnast otsingu sisu. Seda saab teha str_extract() kaudu, mis sisuliselt näitab siis alust mille abiga tulemused leiti. See on siin õppetükis näidiseks, seda edaspidi kasutama ei pea.
+
+```{r}
+
+asukohad %>% 
+  filter(str_detect(word,"kõrts")|str_detect(word,"kirik")) %>% 
+  mutate(type=str_extract(word,"kõrts|kirik")) %>% 
+  ggplot(aes(x=asukoht,y=type))+
+  geom_point()
+
+
+```
+
+Proovi! Otsi mõnd sõna tekstist ja kuva nende asukohad samasuguses graafikus.
+
+```{r}
+
+
+
+
+
+```
+
+
+
+## Sõnade sagedused ja stopsõnad
+
+Me saime kätte sagedasemad sõnad igast peatükist. Teeme graafiku näiteks 10 esimese peatüki sagedasemate sõnade kohta.
+
+```{r}
+peatykid_sonad %>% 
+  mutate(row_number=row_number()) %>% 
+  filter(row_number<11) %>% 
+  filter(chapter<11) %>% 
+  ggplot(aes(x=chapter,y=row_number,label=word))+
+  geom_label()
+
+```
+
+Näeme, et levinumad sõnad on suhteliselt sarnased kui mõned erandid välja arvata. Kui me tahame sisu iseloomustada, ei pruugi kõige sagedasemad sõnad olla alati kõige huvitavamad. Sisuliselt huvitavad sõnad on tihti palju tagapool.
+
+```{r}
+
+raamat1_sonaloend %>% 
+  head(10)
+
+raamat1_sonaloend %>% 
+  slice(200:220)
+
+```
+
+Sisulisi sõnu võib leida korpuseid omavahel võrreldes, aga kõige lihtsam viis on lihtsalt jätta kõrvale sõnad, mis üldiselt sisu palju edasi ei anna. Sõnu, mis me eemaldame tekstist nimetatakse stopsõnadeks, nende jaoks on olemas enamasti standardnimekirjad. Eestikeelne nimekiri on meie andmetega kaasas. Loeme selle sisse.
+
+```{r}
+stopwords <- read_csv("data/stopsonad/estonian-stopwords.txt",col_names = F) %>% rename(word=X1)
+stopwords
+```
+
+Me saame siduda need sõnad oma andmetega join() käskude abil. Seekord kasutame varianti anti_join(), kuna me tahame ühtivad read eemaldada. Siin õppematerjalides me kasutame ainult anti_join() käsku, seda saate lahendustes vajadusel taaskasutada.
+
+```{r}
+raamat1_sonaloend %>% 
+  anti_join(stopwords,"word")
+```
+
+Pärast seda ilmnevad juba sõnad, mis seda teost iseloomustavad. Antud juhul on selleks nimed. Kuna meie unnest_tokens() kaotas ära eristuse suurtähe ja väiketähe vahel, siis need nimed formaalselt enam sõnadest ei ei eristu. unnest_tokens() käsk on aga selle koha pealt paindlik. Vaadates unnest_tokens() dokumentatsiooni näeme aga, et seal on eraldi parameeter to_lower, mis on vaikimisi tõene. Muudame selle ära.
+
+```{r}
+
+?unnest_tokens
+
+```
+
+
+```{r}
+
+raamat1_sonad2 <- raamat1 %>% 
+  unnest_tokens(word,txt,to_lower=F)
+
+raamat1_sonad2 %>% 
+  count(word,sort=T) %>% 
+  anti_join(stopwords,"word")
+
+```
+
+Siin võime eemaldada kõik suurtähega sõnad. Selleks kasutame jälle regulaaravaldisi. Hüüumärgiga saab str_detect() käsu teha eitavaks. Otsime vormi, mis EI sisalda suurtähti.
+
+```{r}
+
+raamat1_sonad2 %>% 
+  count(word,sort=T) %>% 
+  anti_join(stopwords,"word") %>% 
+  filter(!str_detect(word,"[A-ZÕÄÖÜ]"))
+
+```
+
+
+Nii võime vaadata juba iga peatüki kohta sisulisi sõnu, mis seda iseloomustaks, eemaldades siis stopsõnad. Trükime välja igast peatükist esimesed kümme rida.
+
+```{r}
+peatykid_sonad %>% 
+  anti_join(stopwords,"word") %>%
+  mutate(row_number=row_number()) %>% 
+  filter(row_number<11) %>% 
+  filter(chapter<11) %>% 
+  ggplot(aes(x=chapter,y=row_number,label=word))+
+  geom_label()
+```
+
+Võime ka siin nüüd jätta kõrvale suurtähtedega sõnad. Kas meil on tark suurtähed sisse jätta või mitte oleneb küsimusest. Muidu kui meil on sõna "ja" väikse ja suure tähega, siis loeb meie kood neid eraldi. Ja samuti on stopsõnade nimistu algselt ainult väikeste tähtedega. (Seda saab muidugi muuta.)
+
+```{r}
+peatykid_sonad %>% 
+  anti_join(stopwords,"word") %>% 
+  filter(!str_detect(word,"[A-ZÕÄÖÜ]")) %>%
+  mutate(row_number=row_number()) %>% 
+  filter(row_number<11) %>% 
+  filter(chapter<11) %>% 
+  ggplot(aes(x=chapter,y=row_number,label=word))+
+  geom_label()
+```
+
+
+Proovi ka! Võta peatükke iseloomustavad, mis ei ole stopsõnad ega nimed peatükkidest 10-20.
+
+```{r}
+
+
+
+
+
+
+```
+
+### Bigrammid ja trigrammid
+
+unnest_tokens() käsku muutes võime otsida tekstist ka teistsuguseid ühikuid, näiteks kahe või kolmesõnalisi üksusi. Kahesõnalisi üksusi nimetatakse bigrammideks, kolmesõnalisi trigrammideks.
+
+Üks huvitav teema, kus mitmesõnalised üksused võivad oluliseks osutuda, on näiteks raha mainimine antud teoses teoses. Majapidamisest räägitakse palju ja tihti konkreetsete summadega. Leiame täitsa mitu vormi.
+
+```{r}
+
+asukohad %>% 
+  filter(str_detect(word,"rubla")) %>% 
+  ggplot(aes(x=asukoht,y=word))+
+  geom_point()
+
+```
+
+Nüüd võib tekkida küsimus, et mis summadest ikkagi juttu on. Seni oleme vaadanud teksti sõnade kaupa. Nüüd aga tahaks teada midagi eelneva sõna kohta. Üks võimalus on koostada selleks bigrammide loend. unnest_tokens() võimaldab seda teha mõne parameetri muutmisega ja teha ülevaatetabeleid ka sõnajärjenditest. Täpsemat infot saame vaadates dokumentatsiooni.
+
+```{r}
+?unnest_tokens
+```
+
+Bigramme saame teha järgmiselt. n määrab üksuse maksimaalse suuruse ja n_min määrab üksuse minimaalse suuruse.
+
+```{r}
+bigrammid <- raamat1 %>%
+  unnest_tokens(bigram, txt, token = "ngrams", n = 2, n_min = 2)
+```
+
+Nüüd võime rubla fraasid kätte saada puhtalt filter käsu abiga.
+
+```{r}
+bigrammid %>% 
+  filter(str_detect(bigram,"rubla"))
+```
+
+Me võime teha ka kolmgramme või viisgramme.
+
+```{r}
+trigrammid <- raamat1 %>%
+  unnest_tokens(trigram, txt, token = "ngrams", n = 3, n_min = 3)
+```
+
+
+```{r}
+viisgrammid <- raamat1 %>%
+  unnest_tokens(fivegram, txt, token = "ngrams", n = 5, n_min = 5)
+```
+
+```{r}
+
+trigrammid %>% 
+  count(trigram,sort=T)
+
+```
+
+
+```{r}
+
+viisgrammid %>% 
+  count(fivegram,sort=T)
+
+```
+
+Proovi leida konkreetsete teemade kohta kahe- ja kolmesõnalisi üksuseid. Selleks võid kasutada näiteks str_detect() funktsiooni sõnaosade leidmiseks. Milliseid leiad?
+
+```{r}
+
+
+
+
+
+```
+
+
+
+## Lisa: Tulemuste salvestamine
+
+Kui me saame tulemused, mida me soovime esitada, kas hiljem või väljaspool RStudiot, siis peaksime need ka salvestama. Selleks on olemas tabelite puhul read_ käskude asemel write_ käsud. ggplot2 graafikuid saab salvestada funktsiooniga ggsave().
+
+```{r}
+tabel <- raamat1_sonad %>% 
+  count(word,sort=T)  %>% 
+  mutate(freq=n/sum(n)) %>% 
+  filter(str_detect(word,"^mets|^maa|^linn"))
+
+tabel %>% 
+  write_tsv("output/mets_maa_linn.tsv")
+```
+
+
+```{r}
+graafik <- asukohad %>% 
+  filter(str_detect(word,"^mets|^maa|^linn")) %>% 
+  mutate(type=str_extract(word,"^mets|^maa|^linn")) %>% 
+  ggplot(aes(y=type,x=asukoht,color=type))+
+  geom_point(alpha=0.5)
+
+ggsave("plots/mets_maa_linn.png",graafik)
+```
+
+
